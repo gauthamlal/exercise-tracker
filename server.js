@@ -1,6 +1,7 @@
 const express = require('express');
 const mongodb = require('mongodb');
 const mongoose = require('mongoose');
+const shortid = require('shortid');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -16,7 +17,13 @@ app.use(express.urlencoded({extended: true}));
 app.use('/public', express.static(__dirname + '/public'));
 
 let userSchema = new Schema({
-  username: {type: String, unique: true}
+  username: {type: String, unique: true},
+  userID: {type: String, unique: true, default: shortid.generate},
+  exercises: [{
+    description: {type: String, required: true},
+    duration: {type: Number, required: true},
+    date: {type: String, required: true}
+  }]
 });
 
 let User = mongoose.model('User', userSchema);
@@ -25,19 +32,50 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/views/index.html');
 });
 
+// Add a New User
 app.post('/api/exercise/new-user', (req, res) => {
-  console.log(req.body.username);
-  let user = {username: req.body.username};
-  User.create(user, (err, data) => {
-    if (err) {
-      console.log(err);
-      res.json({error: err});
-    } else {
-      console.log(data);
-      res.json({username: data.username, _id: data._id});
+  let user = new User({username: req.body.username});
+  user.save().then((doc) => {
+    res.json({username: doc.username, _id: doc.userID});
+  }).catch(err => {
+    console.log(err);
+    switch (err.code) {
+      case 11000:
+        res.json({error: 'Username already exists.'});
+        break;
+      default:
+        res.json({error: err.name});
+        break;
     }
   });
-  // res.json({username: req.body.username});
+});
+
+// Add an exercise to a specific user
+app.post('/api/exercise/add', (req, res) => {
+  console.log('Inside GET /api/exercise/add');
+  let userID = req.body.userid;
+  let description = req.body.description;
+  let duration = req.body.duration;
+  let date = req.body.date;
+  if (date === "") {
+    date = (new Date()).toISOString().slice(0,10);
+  }
+  User.findOneAndUpdate({userID}, {$push: {exercises: {description, duration, date}}}, {new: true}).then((doc) => {
+    // res.json({username: doc.username, description: doc.description, duration: doc.duration, _id: doc.userID, date: doc.date});
+    console.log(doc);
+    let exercise = doc.exercises[doc.exercises.length-1];
+    // res.json({dsfsd: "Waasdsd"});
+    res.json({
+      username: doc.username,
+      description: exercise.description,
+      duration: exercise.duration,
+      _id: doc.userID,
+      date: exercise.date
+    });
+  }).catch(err => {
+    console.log(err);
+    res.json({err});
+  });
 });
 
 app.listen(port, () => {

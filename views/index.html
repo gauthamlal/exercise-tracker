@@ -10,8 +10,13 @@
       <input type="text" name="username" value="" placeholder="username">
       <input type="submit" name="" value="Submit">
     </form>
-    <form class="" action="index.html" method="post">
 
+    <form class="" action="/api/exercise/add" method="post">
+      <input type="text" name="userid" value="" placeholder="userID*" required>
+      <input type="text" name="description" value="" placeholder="description*" required>
+      <input type="number" name="duration" value="" placeholder="duration* (in mins)" min="0" step="1" required>
+      <input type="date" name="date" value="" placeholder="date">
+      <input type="submit" name="" value="Submit">
     </form>
   </body>
 </html>
