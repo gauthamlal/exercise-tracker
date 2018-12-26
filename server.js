@@ -65,17 +65,26 @@ app.post('/api/exercise/add', (req, res) => {
     console.log(doc);
     let exercise = doc.exercises[doc.exercises.length-1];
     // res.json({dsfsd: "Waasdsd"});
+    console.log(new Date(exercise.date));
     res.json({
       username: doc.username,
       description: exercise.description,
       duration: exercise.duration,
       _id: doc.userID,
-      date: exercise.date
+      date: new Date(exercise.date)
     });
   }).catch(err => {
     console.log(err);
     res.json({err});
   });
+});
+
+app.get('/api/exercise/log', (req, res) => {
+  let userID = req.query.userId;
+  User.findOne({userID}).then( doc => {
+    console.log(doc);
+    res.json(doc);
+  })
 });
 
 app.listen(port, () => {
