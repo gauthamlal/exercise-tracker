@@ -3,6 +3,7 @@ const mongodb = require('mongodb');
 const mongoose = require('mongoose');
 const shortid = require('shortid');
 const cors = require('cors');
+const moment = require('moment');
 require('dotenv').config();
 
 let port = process.env.PORT || 3000;
@@ -60,18 +61,15 @@ app.post('/api/exercise/add', (req, res) => {
   if (date === "") {
     date = (new Date()).toISOString().slice(0,10);
   }
+  date = new Date(date).toISOString();
   User.findOneAndUpdate({userID}, {$push: {exercises: {description, duration, date}}}, {new: true}).then((doc) => {
-    // res.json({username: doc.username, description: doc.description, duration: doc.duration, _id: doc.userID, date: doc.date});
-    console.log(doc);
     let exercise = doc.exercises[doc.exercises.length-1];
-    // res.json({dsfsd: "Waasdsd"});
-    console.log(new Date(exercise.date));
     res.json({
       username: doc.username,
       description: exercise.description,
       duration: exercise.duration,
       _id: doc.userID,
-      date: new Date(exercise.date)
+      date: moment(exercise.date).format('ddd MMM D Y')
     });
   }).catch(err => {
     console.log(err);
@@ -81,10 +79,83 @@ app.post('/api/exercise/add', (req, res) => {
 
 app.get('/api/exercise/log', (req, res) => {
   let userID = req.query.userId;
-  User.findOne({userID}).then( doc => {
+  let from = new Date(req.query.from).toISOString();
+  let to = new Date(req.query.to).toISOString();
+  let limit = req.query.limit;
+  console.log(typeof limit);
+  let matchQuery = {};
+  let conditionalQuery = [];
+  if (req.query.from) {
+    matchQuery.$gt = from;
+    conditionalQuery.push({ "$gt": [ "$$exercise.date", from ] });
+  }
+  if (req.query.to) {
+    matchQuery.$lt = to;
+    conditionalQuery.push({ "$lt": [ "$$exercise.date", to ] });
+  }
+  let query = [
+    {
+      "$match": {
+        userID,
+        "exercises.date": matchQuery
+      }
+    },
+    {
+      "$project": {
+        "_id": "$userID",
+        "username": 1,
+        "exercises": {
+          "$map": {
+            "input": {
+              "$filter": {
+                "input": "$exercises",
+                "as": "exercise",
+                "cond": {
+                  "$and": conditionalQuery
+                }
+              }
+            },
+            "as": "exercise",
+            "in": {
+              "description": "$$exercise.description" ,
+              "duration": "$$exercise.duration" ,
+              "date": "$$exercise.date"
+            }
+          }
+        }
+      }
+    },
+    { $unwind: '$exercises' },
+    {
+      "$sort": {
+        "exercises.date": -1
+      }
+    },
+    {
+      $group: {
+        "_id": "$_id",
+        "username": {$first: "$username"},
+        'exercises': {
+          $push: '$exercises'
+        }
+      }
+    }
+  ];
+  if (limit) {
+    query.splice(4, 0, {$limit: Number(limit)});
+  }
+  console.log('query', query);
+  User.aggregate(query).then( doc => {
     console.log(doc);
-    res.json(doc);
-  })
+    if (!doc[0]) return res.status(404).send('Invalid UserId');
+    doc[0].exercises.forEach(exerciseLog => {
+      exerciseLog.date = moment(exerciseLog.date).format('ddd MMM D Y')
+    });
+    res.json(doc[0]);
+  }).catch(err => {
+    console.log(err);
+    res.json(err);
+  });
 });
 
 app.listen(port, () => {
