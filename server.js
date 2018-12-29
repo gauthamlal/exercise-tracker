@@ -154,7 +154,10 @@ app.get('/api/exercise/log', (req, res) => {
     res.json(doc[0]);
   }).catch(err => {
     console.log(err);
-    res.json(err);
+    res.json({
+      err,
+      username: userID
+    });
   });
 });
 
