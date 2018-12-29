@@ -64,6 +64,7 @@ app.post('/api/exercise/add', (req, res) => {
   date = new Date(date).toISOString();
   User.findOneAndUpdate({userID}, {$push: {exercises: {description, duration, date}}}, {new: true}).then((doc) => {
     let exercise = doc.exercises[doc.exercises.length-1];
+    console.log(new Date());
     res.json({
       username: doc.username,
       description: exercise.description,
@@ -79,26 +80,31 @@ app.post('/api/exercise/add', (req, res) => {
 
 app.get('/api/exercise/log', (req, res) => {
   let userID = req.query.userId;
-  let from = new Date(req.query.from).toISOString();
-  let to = new Date(req.query.to).toISOString();
   let limit = req.query.limit;
+  console.log('userID', userID);
   console.log(typeof limit);
   let matchQuery = {};
   let conditionalQuery = [];
   if (req.query.from) {
+    let from = new Date(req.query.from).toISOString();
     matchQuery.$gt = from;
     conditionalQuery.push({ "$gt": [ "$$exercise.date", from ] });
   }
   if (req.query.to) {
+    let to = new Date(req.query.to).toISOString();
     matchQuery.$lt = to;
     conditionalQuery.push({ "$lt": [ "$$exercise.date", to ] });
   }
+  let matchObject = {userID};
+  if (matchQuery.$gt || matchQuery.$lt) {
+    matchObject["exercises.date"] = matchQuery
+  } else {
+    console.log('Empty Object');
+  }
+  console.log(matchObject);
   let query = [
     {
-      "$match": {
-        userID,
-        "exercises.date": matchQuery
-      }
+      "$match": matchObject
     },
     {
       "$project": {
@@ -142,6 +148,7 @@ app.get('/api/exercise/log', (req, res) => {
     }
   ];
   if (limit) {
+    console.log('inside limit');
     query.splice(4, 0, {$limit: Number(limit)});
   }
   console.log('query', query);
